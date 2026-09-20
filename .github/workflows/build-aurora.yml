@@ -3,7 +3,7 @@ on:
   workflow_dispatch:
   push:
     paths:
-      - 'AuroraKeyboard-ShiftFix-v1.10-source.zip'
+      - 'AuroraKeyboard-SuggestionLanguageFix-v1.11-source.zip'
       - '.github/workflows/build-aurora.yml'
 jobs:
   build:
@@ -16,8 +16,8 @@ jobs:
           java-version: '17'
       - name: Extract Aurora Android project
         run: |
-          test -f AuroraKeyboard-ShiftFix-v1.10-source.zip || exit 1
-          unzip -q AuroraKeyboard-ShiftFix-v1.10-source.zip -d extracted
+          test -f AuroraKeyboard-SuggestionLanguageFix-v1.11-source.zip || exit 1
+          unzip -q AuroraKeyboard-SuggestionLanguageFix-v1.11-source.zip -d extracted
           test -f extracted/AuroraKeyboard/settings.gradle.kts || exit 1
       - name: Fix Settings ScrollView property
         run: |
@@ -37,6 +37,6 @@ jobs:
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: AuroraKeyboard-v1.10-shift-fix-apk
+          name: AuroraKeyboard-v1.11-suggestion-language-fix-apk
           path: extracted/AuroraKeyboard/app/build/outputs/apk/debug/*.apk
           if-no-files-found: error
