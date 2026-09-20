@@ -19,6 +19,10 @@ jobs:
           test -f AuroraKeyboard-Emoji-v1.1-source.zip || exit 1
           unzip -q AuroraKeyboard-Emoji-v1.1-source.zip -d extracted
           test -f extracted/AuroraKeyboard/settings.gradle.kts || exit 1
+      - name: Fix Settings ScrollView property
+        run: |
+          sed -i 's/\bfillViewport = true\b/isFillViewport = true/g' extracted/AuroraKeyboard/app/src/main/java/com/aurora/keyboard/SettingsActivity.kt
+          grep 'isFillViewport = true' extracted/AuroraKeyboard/app/src/main/java/com/aurora/keyboard/SettingsActivity.kt
       - name: Add Aurora launcher icon
         run: |
           mkdir -p extracted/AuroraKeyboard/app/src/main/res/drawable
