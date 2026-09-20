@@ -3,7 +3,7 @@ on:
   workflow_dispatch:
   push:
     paths:
-      - 'AuroraKeyboard-TypingFeel-v0.4-source.zip'
+      - 'AuroraKeyboard-Emoji-v1.1-source.zip'
       - '.github/workflows/build-aurora.yml'
 jobs:
   build:
@@ -16,16 +16,15 @@ jobs:
           java-version: '17'
       - name: Extract Aurora Android project
         run: |
-          test -f AuroraKeyboard-TypingFeel-v0.4-source.zip || { echo 'Missing v0.4 source ZIP'; exit 1; }
-          unzip -q AuroraKeyboard-TypingFeel-v0.4-source.zip -d extracted
+          test -f AuroraKeyboard-Emoji-v1.1-source.zip || exit 1
+          unzip -q AuroraKeyboard-Emoji-v1.1-source.zip -d extracted
           test -f extracted/AuroraKeyboard/settings.gradle.kts || exit 1
-      - name: Add Aurora app launcher icon
+      - name: Add Aurora launcher icon
         run: |
           mkdir -p extracted/AuroraKeyboard/app/src/main/res/drawable
           printf '%s\n' '<vector xmlns:android="http://schemas.android.com/apk/res/android" android:width="108dp" android:height="108dp" android:viewportWidth="108" android:viewportHeight="108"><path android:fillColor="#171C40" android:pathData="M0,0h108v108h-108z"/><path android:fillColor="#745BFF" android:pathData="M54,10C78,10 98,30 98,54C98,78 78,98 54,98C30,98 10,78 10,54C10,30 30,10 54,10Z"/><path android:fillColor="#FFFFFF" android:pathData="M54,24L81,78L69,78L63,65L45,65L39,78L27,78Z M54,43L48,56L60,56Z"/></vector>' > extracted/AuroraKeyboard/app/src/main/res/drawable/aurora_launcher.xml
           sed -i 's/<application /<application android:icon="@drawable\/aurora_launcher" /' extracted/AuroraKeyboard/app/src/main/AndroidManifest.xml
-          grep 'android:icon=' extracted/AuroraKeyboard/app/src/main/AndroidManifest.xml
-      - name: Build installable debug APK
+      - name: Build APK
         working-directory: extracted/AuroraKeyboard
         run: |
           gradle wrapper --gradle-version 8.9
@@ -34,6 +33,6 @@ jobs:
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: AuroraKeyboard-v0.4-with-icon-apk
+          name: AuroraKeyboard-v1.1-emoji-apk
           path: extracted/AuroraKeyboard/app/build/outputs/apk/debug/*.apk
           if-no-files-found: error
