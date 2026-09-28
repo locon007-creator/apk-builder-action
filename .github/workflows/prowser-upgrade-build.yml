@@ -1,0 +1,35 @@
+name: Build Prowser Upgrade
+on:
+  push:
+    branches: [prowser-upgrade-build]
+    paths:
+      - 'prowser-trigger.txt'
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Reassemble source
+        run: |
+          cat prowser_payload/chunk* | base64 -d > prowser-upgraded-source.zip
+          mkdir extracted
+          unzip -q prowser-upgraded-source.zip -d extracted
+      - name: Install and sync
+        working-directory: extracted/prowser
+        run: |
+          npm ci
+          npm run android:sync
+          chmod +x android/gradlew
+      - name: Build debug APK
+        working-directory: extracted/prowser/android
+        run: ./gradlew assembleDebug --stacktrace
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: Prowser-Upgraded-APK
+          path: extracted/prowser/android/app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
