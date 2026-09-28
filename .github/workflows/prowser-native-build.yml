@@ -4,6 +4,8 @@ on:
     branches: [prowser-upgrade-build]
     paths:
       - 'prowser-native-trigger.txt'
+permissions:
+  contents: write
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -19,9 +21,17 @@ jobs:
       - name: Build Prowser
         working-directory: prowser_native
         run: gradle :app:assembleDebug --stacktrace
-      - name: Upload APK
+      - name: Prepare APK
+        run: cp prowser_native/app/build/outputs/apk/debug/app-debug.apk Prowser-v1.1.apk
+      - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
           name: Prowser-v1.1-APK
-          path: prowser_native/app/build/outputs/apk/debug/*.apk
+          path: Prowser-v1.1.apk
           if-no-files-found: error
+      - name: Publish temporary release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release delete prowser-v1.1-build -y --cleanup-tag || true
+          gh release create prowser-v1.1-build Prowser-v1.1.apk --target prowser-upgrade-build --title "Prowser v1.1 Build" --notes "Temporary build artifact for Prowser v1.1."
