@@ -34,6 +34,8 @@ public class MainActivity extends Activity {
     private LinearLayout tabsPage;
     private ScrollView tabsScroll;
     private LinearLayout tabsList;
+    private LinearLayout bookmarksPage;
+    private LinearLayout bookmarksList;
     private View customView;
     private FrameLayout customContainer;
     private WebChromeClient.CustomViewCallback customCallback;
@@ -135,6 +137,7 @@ public class MainActivity extends Activity {
         buildHome();
         buildWeb();
         buildTabsPage();
+        buildBookmarksPage();
 
         buildBrowserBottomBar();
         setContentView(root);
@@ -398,6 +401,209 @@ public class MainActivity extends Activity {
         root.requestApplyInsets();
     }
 
+    private void buildBookmarksPage(){
+        bookmarksPage=new LinearLayout(this);
+        bookmarksPage.setOrientation(LinearLayout.VERTICAL);
+        bookmarksPage.setBackgroundColor(BG);
+        bookmarksPage.setPadding(dp(14),dp(8),dp(14),dp(12));
+        bookmarksPage.setVisibility(View.GONE);
+
+        LinearLayout header=new LinearLayout(this);
+        header.setGravity(Gravity.CENTER_VERTICAL);
+
+        TextView back=text("‹",32,TEXT);
+        back.setGravity(Gravity.CENTER);
+        back.setClickable(true);
+        back.setOnClickListener(v->hideBookmarksPage());
+
+        TextView title=text("Bookmarks",24,TEXT);
+        title.setTypeface(null,1);
+
+        TextView add=text("+ Save",14,ACCENT);
+        add.setGravity(Gravity.CENTER);
+        add.setPadding(dp(10),0,dp(10),0);
+        add.setClickable(true);
+        add.setOnClickListener(v->saveCurrentBookmark());
+
+        header.addView(back,new LinearLayout.LayoutParams(dp(44),dp(52)));
+        header.addView(title,new LinearLayout.LayoutParams(0,dp(52),1));
+        header.addView(add,new LinearLayout.LayoutParams(-2,dp(44)));
+        bookmarksPage.addView(header,new LinearLayout.LayoutParams(-1,dp(58)));
+
+        TextView sub=text("Saved websites stay here for quick access.",12,MUTED);
+        bookmarksPage.addView(sub,new LinearLayout.LayoutParams(-1,dp(38)));
+
+        bookmarksList=new LinearLayout(this);
+        bookmarksList.setOrientation(LinearLayout.VERTICAL);
+
+        ScrollView scroll=new ScrollView(this);
+        scroll.addView(bookmarksList,new ScrollView.LayoutParams(-1,-2));
+        bookmarksPage.addView(scroll,new LinearLayout.LayoutParams(-1,0,1));
+
+        content.addView(bookmarksPage,new FrameLayout.LayoutParams(-1,-1));
+    }
+
+    private Set<String> readBookmarks(){
+        return new LinkedHashSet<>(prefs.getStringSet("bookmarks",new LinkedHashSet<>()));
+    }
+
+    private void writeBookmarks(Set<String> items){
+        prefs.edit().putStringSet("bookmarks",new LinkedHashSet<>(items)).apply();
+    }
+
+    private void saveCurrentBookmark(){
+        if(activeTab<0 || activeTab>=tabs.size() || tabs.get(activeTab).url.isEmpty()){
+            Toast.makeText(this,"Open a website first",Toast.LENGTH_SHORT).show();
+            return;
+        }
+        Tab t=tabs.get(activeTab);
+        Set<String> items=readBookmarks();
+        items.add((t.title==null||t.title.isEmpty()?host(t.url):t.title)+"\t"+t.url);
+        writeBookmarks(items);
+        Toast.makeText(this,"Bookmark saved",Toast.LENGTH_SHORT).show();
+        if(bookmarksPage.getVisibility()==View.VISIBLE) refreshBookmarksPage();
+    }
+
+    private void refreshBookmarksPage(){
+        bookmarksList.removeAllViews();
+        Set<String> items=readBookmarks();
+        if(items.isEmpty()){
+            TextView empty=text("No bookmarks yet.",14,MUTED);
+            empty.setGravity(Gravity.CENTER);
+            bookmarksList.addView(empty,new LinearLayout.LayoutParams(-1,dp(120)));
+            return;
+        }
+        for(String item:items){
+            String[] parts=item.split("\\t",2);
+            String title=parts.length>0?parts[0]:"Saved page";
+            String url=parts.length>1?parts[1]:"";
+
+            LinearLayout card=new LinearLayout(this);
+            card.setOrientation(LinearLayout.VERTICAL);
+            card.setPadding(dp(16),dp(12),dp(12),dp(10));
+            card.setBackground(strokeBg(SURFACE,18,Color.rgb(45,48,61)));
+
+            LinearLayout row=new LinearLayout(this);
+            row.setGravity(Gravity.CENTER_VERTICAL);
+
+            TextView name=text(title,15,TEXT);
+            name.setMaxLines(1);
+            name.setEllipsize(android.text.TextUtils.TruncateAt.END);
+            name.setClickable(true);
+            name.setOnClickListener(v->{ loadUrl(url); hideBookmarksPage(); });
+
+            TextView close=text("×",28,MUTED);
+            close.setGravity(Gravity.CENTER);
+            close.setClickable(true);
+            close.setOnClickListener(v->{
+                Set<String> set=readBookmarks();
+                set.remove(item);
+                writeBookmarks(set);
+                refreshBookmarksPage();
+            });
+
+            row.addView(name,new LinearLayout.LayoutParams(0,dp(42),1));
+            row.addView(close,new LinearLayout.LayoutParams(dp(44),dp(44)));
+            card.addView(row,new LinearLayout.LayoutParams(-1,dp(44)));
+
+            TextView domain=text(host(url),11,MUTED);
+            card.addView(domain,new LinearLayout.LayoutParams(-1,dp(30)));
+
+            card.setClickable(true);
+            card.setOnClickListener(v->{ loadUrl(url); hideBookmarksPage(); });
+
+            LinearLayout.LayoutParams cp=new LinearLayout.LayoutParams(-1,dp(86));
+            cp.bottomMargin=dp(10);
+            bookmarksList.addView(card,cp);
+        }
+    }
+
+    private void showBookmarksPage(){
+        if(videoMode) exitVideoMode();
+        refreshBookmarksPage();
+        home.setVisibility(View.GONE);
+        web.setVisibility(View.GONE);
+        tabsPage.setVisibility(View.GONE);
+        bookmarksPage.setVisibility(View.VISIBLE);
+        topBar.setVisibility(View.GONE);
+        progress.setVisibility(View.GONE);
+        bottomBar.setVisibility(View.GONE);
+    }
+
+    private void hideBookmarksPage(){
+        bookmarksPage.setVisibility(View.GONE);
+        topBar.setVisibility(View.VISIBLE);
+        progress.setVisibility(View.VISIBLE);
+        bottomBar.setVisibility(View.VISIBLE);
+        if(activeTab>=0 && !tabs.get(activeTab).url.isEmpty()){
+            web.setVisibility(View.VISIBLE);
+            home.setVisibility(View.GONE);
+        }else{
+            showHome();
+        }
+        root.requestApplyInsets();
+    }
+
+    private void requestProwserFullscreen(){
+        if(web==null) return;
+        web.evaluateJavascript(
+            "(function(){try{const v=document.querySelector('video');if(!v)return 'none';" +
+            "if(v.requestFullscreen){v.requestFullscreen();return 'requested';}" +
+            "if(v.webkitRequestFullscreen){v.webkitRequestFullscreen();return 'requested';}" +
+            "if(v.webkitEnterFullscreen){v.webkitEnterFullscreen();return 'requested';}" +
+            "return 'native';}catch(e){return 'native';}})();",
+            result->{
+                String r=result==null?"":result.replace("\"","");
+                videoHandler.postDelayed(()->{
+                    if(customView==null && !isInPictureInPictureMode()) enterNativeVideoFullscreen();
+                },350);
+            }
+        );
+    }
+
+    private void enterNativeVideoFullscreen(){
+        if(web==null || customView!=null) return;
+
+        FrameLayout frame=new FrameLayout(this);
+        frame.setBackgroundColor(Color.BLACK);
+
+        WebView videoWeb=new WebView(this);
+        WebSettings s=videoWeb.getSettings();
+        s.setJavaScriptEnabled(true);
+        s.setDomStorageEnabled(true);
+        s.setMediaPlaybackRequiresUserGesture(false);
+        s.setUseWideViewPort(true);
+        s.setLoadWithOverviewMode(true);
+        CookieManager.getInstance().setAcceptCookie(true);
+        CookieManager.getInstance().setAcceptThirdPartyCookies(videoWeb,false);
+
+        String current=web.getUrl();
+        if(current!=null) videoWeb.loadUrl(current);
+
+        videoWeb.setWebViewClient(new WebViewClient(){
+            @Override public void onPageFinished(WebView v,String url){
+                v.evaluateJavascript(
+                    "(function(){const v=document.querySelector('video');if(v){v.play().catch(()=>{});if(v.requestFullscreen)v.requestFullscreen();}})();",
+                    null
+                );
+            }
+        });
+        videoWeb.setWebChromeClient(new ProwserChrome());
+
+        frame.addView(videoWeb,new FrameLayout.LayoutParams(-1,-1));
+        customView=frame;
+        customContainer=new FrameLayout(this);
+        customContainer.setBackgroundColor(Color.BLACK);
+        customContainer.addView(frame,new FrameLayout.LayoutParams(-1,-1));
+        addContentView(customContainer,new ViewGroup.LayoutParams(-1,-1));
+
+        getWindow().getDecorView().setSystemUiVisibility(
+            View.SYSTEM_UI_FLAG_FULLSCREEN |
+            View.SYSTEM_UI_FLAG_HIDE_NAVIGATION |
+            View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
+        );
+    }
+
     private void buildBrowserBottomBar(){
         if(bottomBar!=null) root.removeView(bottomBar);
         bottomBar=new LinearLayout(this);
@@ -440,7 +646,7 @@ public class MainActivity extends Activity {
         rewind.setOnClickListener(v->videoCommand("const v=document.querySelector('video');if(v)v.currentTime=Math.max(0,v.currentTime-15);"));
         play.setOnClickListener(v->videoCommand("const v=document.querySelector('video');if(v){if(v.paused)v.play();else v.pause();}"));
         forward.setOnClickListener(v->videoCommand("const v=document.querySelector('video');if(v)v.currentTime=Math.min(v.duration||1e9,v.currentTime+15);"));
-        fullscreen.setOnClickListener(v->videoCommand("const v=document.querySelector('video');if(v){if(v.requestFullscreen)v.requestFullscreen();else if(v.webkitEnterFullscreen)v.webkitEnterFullscreen();}"));
+        fullscreen.setOnClickListener(v->requestProwserFullscreen());
         more.setOnClickListener(v->{
             PopupMenu m=new PopupMenu(this,more);
             m.getMenu().add("Browser controls");
@@ -685,6 +891,7 @@ public class MainActivity extends Activity {
         t.url=url; t.title=host(url); t.lastUsed=System.currentTimeMillis();
         applyPrivacy();
         tabsPage.setVisibility(View.GONE);
+        if(bookmarksPage!=null) bookmarksPage.setVisibility(View.GONE);
         home.setVisibility(View.GONE);
         web.setVisibility(View.VISIBLE);
         address.setText(url);
@@ -706,6 +913,7 @@ public class MainActivity extends Activity {
             web.setVisibility(View.GONE);
         }
         tabsPage.setVisibility(View.GONE);
+        if(bookmarksPage!=null) bookmarksPage.setVisibility(View.GONE);
         home.setVisibility(View.VISIBLE);
         progress.setProgress(0);
         address.setText("");
@@ -774,6 +982,10 @@ public class MainActivity extends Activity {
 
     private void showMainMenu(View anchor){
         PopupMenu m=new PopupMenu(this,anchor);
+        m.getMenu().add("Home");
+        m.getMenu().add("Bookmarks");
+        m.getMenu().add("Save bookmark");
+        m.getMenu().add("Tabs");
         m.getMenu().add("New tab");
         m.getMenu().add("Search engine");
         if(videoDetected) m.getMenu().add(videoMode?"Browser controls":"Video controls");
@@ -782,7 +994,11 @@ public class MainActivity extends Activity {
         m.getMenu().add("Open in another browser");
         m.setOnMenuItemClickListener(item->{
             String x=item.getTitle().toString();
-            if(x.equals("New tab")) newTab(true);
+            if(x.equals("Home")) showHome();
+            else if(x.equals("Bookmarks")) showBookmarksPage();
+            else if(x.equals("Save bookmark")) saveCurrentBookmark();
+            else if(x.equals("Tabs")) showTabsPage();
+            else if(x.equals("New tab")) newTab(true);
             else if(x.equals("Search engine")) showSearchEnginePicker();
             else if(x.equals("Video controls")) enterVideoMode();
             else if(x.equals("Browser controls")) exitVideoMode();
@@ -986,6 +1202,13 @@ public class MainActivity extends Activity {
         if(customContainer!=null && customContainer.getParent()!=null){
             ((ViewGroup)customContainer.getParent()).removeView(customContainer);
         }
+        if(customView instanceof ViewGroup){
+            ViewGroup vg=(ViewGroup)customView;
+            for(int i=0;i<vg.getChildCount();i++){
+                View child=vg.getChildAt(i);
+                if(child instanceof WebView){ ((WebView)child).stopLoading(); ((WebView)child).destroy(); }
+            }
+        }
         if(customCallback!=null) customCallback.onCustomViewHidden();
         customView=null;
         customContainer=null;
@@ -997,6 +1220,10 @@ public class MainActivity extends Activity {
     @Override public void onBackPressed(){
         if(customView!=null){
             hideCustomVideo();
+            return;
+        }
+        if(bookmarksPage!=null && bookmarksPage.getVisibility()==View.VISIBLE){
+            hideBookmarksPage();
             return;
         }
         if(tabsPage!=null && tabsPage.getVisibility()==View.VISIBLE){
