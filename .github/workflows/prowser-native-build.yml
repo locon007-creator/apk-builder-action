@@ -35,3 +35,11 @@ jobs:
         run: |
           gh release delete prowser-v1.1-build -y --cleanup-tag || true
           gh release create prowser-v1.1-build Prowser-v1.1.apk --target prowser-upgrade-build --title "Prowser v1.1 Build" --notes "Temporary build artifact for Prowser v1.1."
+      - name: Record successful build
+        run: |
+          printf "run_id=%s\nrelease=https://github.com/locon007-creator/apk-builder-action/releases/download/prowser-v1.1-build/Prowser-v1.1.apk\n" "$GITHUB_RUN_ID" > prowser-build-status.txt
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add prowser-build-status.txt
+          git commit -m "Record successful Prowser v1.1 build"
+          git push origin HEAD:prowser-upgrade-build
