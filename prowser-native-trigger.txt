@@ -1,1 +1,1 @@
-build Prowser v1.5 fullscreen overlay nav visuals
+build Prowser v1.6 google compatibility
