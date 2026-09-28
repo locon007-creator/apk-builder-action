@@ -1,1 +1,1 @@
-build Prowser v1.3 video tabs quick search
+build Prowser v1.4 fullscreen bookmarks menu
