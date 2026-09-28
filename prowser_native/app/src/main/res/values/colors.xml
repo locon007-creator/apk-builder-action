@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="prowser_bg">#08090D</color>
+    <color name="prowser_accent">#967EFF</color>
+    <color name="prowser_accent_2">#5B42D8</color>
+    <color name="white">#FFFFFF</color>
+</resources>
