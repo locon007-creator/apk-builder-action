@@ -857,10 +857,40 @@ public class MainActivity extends Activity {
         shield.setTextColor(privacy.equals("private")?MUTED:OK);
     }
 
+    private boolean isGoogleUrl(String url){
+        try{
+            String h=Uri.parse(url).getHost();
+            if(h==null) return false;
+            h=h.toLowerCase(Locale.US);
+            return h.equals("google.com") || h.endsWith(".google.com");
+        }catch(Exception e){
+            return false;
+        }
+    }
+
+    private void applySiteCompatibility(String url){
+        boolean google=isGoogleUrl(url);
+        CookieManager cm=CookieManager.getInstance();
+
+        // Google compatibility: preserve a stable first-party session and allow
+        // the cookie flow its search/verification pages expect while on Google.
+        cm.setAcceptCookie(true);
+        cm.setAcceptThirdPartyCookies(web,google);
+
+        // Avoid making every Google navigation look like a fresh browser session.
+        if(google){
+            web.getSettings().setCacheMode(WebSettings.LOAD_DEFAULT);
+        }else{
+            web.getSettings().setCacheMode(
+                privacy.equals("maximum") ? WebSettings.LOAD_NO_CACHE : WebSettings.LOAD_DEFAULT
+            );
+        }
+    }
+
     private void applyPrivacy(){
-        CookieManager.getInstance().setAcceptThirdPartyCookies(web,false);
-        web.getSettings().setCacheMode(privacy.equals("maximum")?WebSettings.LOAD_NO_CACHE:WebSettings.LOAD_DEFAULT);
-        if(privacy.equals("maximum")) web.clearCache(true);
+        String current=web!=null?web.getUrl():null;
+        applySiteCompatibility(current);
+        if(privacy.equals("maximum") && !isGoogleUrl(current)) web.clearCache(true);
     }
 
     private String searchUrl(String q){
@@ -908,7 +938,7 @@ public class MainActivity extends Activity {
         if(activeTab<0) newTab(false);
         Tab t=tabs.get(activeTab);
         t.url=url; t.title=host(url); t.lastUsed=System.currentTimeMillis();
-        applyPrivacy();
+        applySiteCompatibility(url);
         tabsPage.setVisibility(View.GONE);
         if(bookmarksPage!=null) bookmarksPage.setVisibility(View.GONE);
         home.setVisibility(View.GONE);
@@ -1086,6 +1116,7 @@ public class MainActivity extends Activity {
 
     private class ProwserClient extends WebViewClient {
         @Override public void onPageStarted(WebView v,String url,Bitmap icon){
+            applySiteCompatibility(url);
             progress.setProgress(8);
             address.setText(url);
             videoDetected=false;
@@ -1105,6 +1136,7 @@ public class MainActivity extends Activity {
                 tabs.get(activeTab).lastUsed=System.currentTimeMillis();
             }
             address.setText(url);
+            if(isGoogleUrl(url)) CookieManager.getInstance().flush();
             updateTabsLabel();
             detectVideo();
         }
