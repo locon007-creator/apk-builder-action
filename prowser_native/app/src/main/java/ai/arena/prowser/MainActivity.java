@@ -38,6 +38,7 @@ public class MainActivity extends Activity {
     private LinearLayout bookmarksList;
     private View customView;
     private FrameLayout customContainer;
+    private LinearLayout fullscreenControls;
     private WebChromeClient.CustomViewCallback customCallback;
     private final ArrayList<Tab> tabs = new ArrayList<>();
     private int activeTab = -1;
@@ -95,15 +96,26 @@ public class MainActivity extends Activity {
     }
 
     private TextView navButton(String symbol,String label){
-        TextView v=text(symbol+"\n"+label,11,TEXT);
+        TextView v=text(symbol+"\n"+label,12,TEXT);
         v.setGravity(Gravity.CENTER);
         v.setTextAlignment(View.TEXT_ALIGNMENT_CENTER);
-        v.setLineSpacing(0f,.93f);
-        v.setPadding(dp(4),dp(2),dp(4),dp(2));
-        v.setBackground(bg(Color.TRANSPARENT,14));
+        v.setLineSpacing(dp(1),1.0f);
+        v.setPadding(dp(6),dp(6),dp(6),dp(5));
+        v.setBackground(strokeBg(SURFACE,18,Color.rgb(50,53,68)));
         v.setClickable(true);
         v.setFocusable(true);
-        v.setMinHeight(dp(56));
+        v.setMinHeight(dp(62));
+        v.setElevation(dp(2));
+        v.setOnTouchListener((view,event)->{
+            if(event.getAction()==MotionEvent.ACTION_DOWN){
+                view.setAlpha(.72f);
+                view.setScaleX(.96f);
+                view.setScaleY(.96f);
+            }else if(event.getAction()==MotionEvent.ACTION_UP || event.getAction()==MotionEvent.ACTION_CANCEL){
+                view.animate().alpha(1f).scaleX(1f).scaleY(1f).setDuration(100).start();
+            }
+            return false;
+        });
         return v;
     }
 
@@ -595,6 +607,7 @@ public class MainActivity extends Activity {
         customContainer=new FrameLayout(this);
         customContainer.setBackgroundColor(Color.BLACK);
         customContainer.addView(frame,new FrameLayout.LayoutParams(-1,-1));
+        addFullscreenControls(customContainer);
         addContentView(customContainer,new ViewGroup.LayoutParams(-1,-1));
 
         getWindow().getDecorView().setSystemUiVisibility(
@@ -608,25 +621,31 @@ public class MainActivity extends Activity {
         if(bottomBar!=null) root.removeView(bottomBar);
         bottomBar=new LinearLayout(this);
         bottomBar.setGravity(Gravity.TOP|Gravity.CENTER_HORIZONTAL);
+        bottomBar.setPadding(dp(8),dp(7),dp(8),dp(8)+bottomInset);
         bottomBar.setBackgroundColor(BG);
 
-        TextView back=navButton("‹","Back");
-        TextView fwd=navButton("›","Forward");
+        TextView back=navButton("←","Back");
+        TextView fwd=navButton("→","Forward");
         TextView search=navButton("⌕","Search");
-        TextView tabsBtn=navButton("▢","Tabs");
-        TextView menu=navButton("⋯","Menu");
+        TextView tabsBtn=navButton("▣","Tabs");
+        TextView menu=navButton("•••","Menu");
 
         back.setOnClickListener(v->{ if(web.getVisibility()==View.VISIBLE && web.canGoBack()) web.goBack(); else showHome(); });
         fwd.setOnClickListener(v->{ if(web.getVisibility()==View.VISIBLE && web.canGoForward()) web.goForward(); });
+        search.setBackground(strokeBg(SURFACE2,18,ACCENT));
+        search.setTextColor(Color.WHITE);
         search.setOnClickListener(v->showQuickSearch());
         tabsBtn.setOnClickListener(v->showTabsPage());
         menu.setOnClickListener(v->showMainMenu(menu));
 
         for(TextView x:new TextView[]{back,fwd,search,tabsBtn,menu}){
-            bottomBar.addView(x,new LinearLayout.LayoutParams(0,dp(60),1));
+            LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(0,dp(64),1);
+            p.leftMargin=dp(3);
+            p.rightMargin=dp(3);
+            bottomBar.addView(x,p);
         }
         tabCount=tabsBtn;
-        root.addView(bottomBar,new LinearLayout.LayoutParams(-1,dp(72)+bottomInset));
+        root.addView(bottomBar,new LinearLayout.LayoutParams(-1,dp(80)+bottomInset));
         updateBottomBarInsets();
         updateTabsLabel();
     }
@@ -671,7 +690,7 @@ public class MainActivity extends Activity {
         for(TextView x:new TextView[]{rewind,play,forward,fullscreen,more}){
             bottomBar.addView(x,new LinearLayout.LayoutParams(0,dp(60),1));
         }
-        root.addView(bottomBar,new LinearLayout.LayoutParams(-1,dp(72)+bottomInset));
+        root.addView(bottomBar,new LinearLayout.LayoutParams(-1,dp(80)+bottomInset));
         updateBottomBarInsets();
     }
 
@@ -680,7 +699,7 @@ public class MainActivity extends Activity {
         bottomBar.setPadding(dp(8),dp(4),dp(8),dp(8)+bottomInset);
         ViewGroup.LayoutParams p=bottomBar.getLayoutParams();
         if(p!=null){
-            p.height=dp(72)+bottomInset;
+            p.height=dp(80)+bottomInset;
             bottomBar.setLayoutParams(p);
         }
     }
@@ -1148,6 +1167,7 @@ public class MainActivity extends Activity {
             customContainer=new FrameLayout(MainActivity.this);
             customContainer.setBackgroundColor(Color.BLACK);
             customContainer.addView(view,new FrameLayout.LayoutParams(-1,-1));
+            addFullscreenControls(customContainer);
             addContentView(customContainer,new ViewGroup.LayoutParams(-1,-1));
             getWindow().getDecorView().setSystemUiVisibility(
                 View.SYSTEM_UI_FLAG_FULLSCREEN |
@@ -1160,6 +1180,63 @@ public class MainActivity extends Activity {
         @Override public void onHideCustomView(){
             hideCustomVideo();
         }
+    }
+
+    private TextView fullscreenControlButton(String label,int size){
+        TextView b=text(label,size,Color.WHITE);
+        b.setGravity(Gravity.CENTER);
+        b.setBackground(strokeBg(Color.argb(190,20,22,30),16,Color.argb(120,255,255,255)));
+        b.setClickable(true);
+        b.setFocusable(true);
+        b.setPadding(dp(8),dp(6),dp(8),dp(6));
+        b.setElevation(dp(5));
+        return b;
+    }
+
+    private void addFullscreenControls(FrameLayout parent){
+        if(fullscreenControls!=null && fullscreenControls.getParent()!=null){
+            ((ViewGroup)fullscreenControls.getParent()).removeView(fullscreenControls);
+        }
+
+        fullscreenControls=new LinearLayout(this);
+        fullscreenControls.setOrientation(LinearLayout.VERTICAL);
+        fullscreenControls.setGravity(Gravity.CENTER_HORIZONTAL);
+        fullscreenControls.setPadding(dp(8),dp(8),dp(8),dp(8));
+        fullscreenControls.setBackground(bg(Color.argb(105,8,9,13),20));
+        fullscreenControls.setElevation(dp(12));
+
+        LinearLayout seekRow=new LinearLayout(this);
+        seekRow.setGravity(Gravity.CENTER);
+
+        TextView back15=fullscreenControlButton("−15",14);
+        TextView forward15=fullscreenControlButton("+15",14);
+        back15.setOnClickListener(v->videoCommand("const v=document.querySelector('video');if(v)v.currentTime=Math.max(0,v.currentTime-15);"));
+        forward15.setOnClickListener(v->videoCommand("const v=document.querySelector('video');if(v)v.currentTime=Math.min(v.duration||1e9,v.currentTime+15);"));
+
+        LinearLayout.LayoutParams seekP=new LinearLayout.LayoutParams(dp(54),dp(42));
+        seekP.leftMargin=dp(3);
+        seekP.rightMargin=dp(3);
+        seekRow.addView(back15,seekP);
+        seekRow.addView(forward15,seekP);
+        fullscreenControls.addView(seekRow,new LinearLayout.LayoutParams(-1,dp(44)));
+
+        TextView play=fullscreenControlButton("▶  ❚❚",15);
+        play.setOnClickListener(v->videoCommand("const v=document.querySelector('video');if(v){if(v.paused)v.play();else v.pause();}"));
+        LinearLayout.LayoutParams playP=new LinearLayout.LayoutParams(dp(112),dp(46));
+        playP.topMargin=dp(6);
+        fullscreenControls.addView(play,playP);
+
+        TextView exit=fullscreenControlButton("Exit Fullscreen",12);
+        exit.setOnClickListener(v->hideCustomVideo());
+        LinearLayout.LayoutParams exitP=new LinearLayout.LayoutParams(dp(112),dp(42));
+        exitP.topMargin=dp(6);
+        fullscreenControls.addView(exit,exitP);
+
+        FrameLayout.LayoutParams overlayP=new FrameLayout.LayoutParams(dp(132),dp(156));
+        overlayP.gravity=Gravity.TOP|Gravity.END;
+        overlayP.topMargin=dp(18);
+        overlayP.rightMargin=dp(14);
+        parent.addView(fullscreenControls,overlayP);
     }
 
     private void installVideoGestures(View v){
@@ -1212,6 +1289,7 @@ public class MainActivity extends Activity {
         if(customCallback!=null) customCallback.onCustomViewHidden();
         customView=null;
         customContainer=null;
+        fullscreenControls=null;
         customCallback=null;
         getWindow().getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_VISIBLE);
         root.requestApplyInsets();
