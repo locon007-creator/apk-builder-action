@@ -2,9 +2,7 @@
 <resources>
     <style name="AppTheme.Splash" parent="android:style/Theme.Material.NoActionBar">
         <item name="android:windowSplashScreenBackground">@color/prowser_bg</item>
-        <item name="android:windowSplashScreenAnimatedIcon">@drawable/splash_logo</item>
-        <item name="android:postSplashScreenTheme">@style/AppTheme</item>
-        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowSplashScreenAnimatedIcon">@drawable/splash_logo</item>        <item name="android:windowLightStatusBar">false</item>
         <item name="android:navigationBarColor">@color/prowser_bg</item>
     </style>
 </resources>
