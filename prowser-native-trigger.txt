@@ -1,1 +1,1 @@
-build Prowser v1.1 native upgrade compile-fix
+build Prowser v1.2 redesigned controls icon splash
