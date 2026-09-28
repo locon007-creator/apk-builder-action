@@ -1,1 +1,1 @@
-build Prowser v1.2 redesigned controls icon splash
+build Prowser v1.2 redesigned controls icon splash fix2
