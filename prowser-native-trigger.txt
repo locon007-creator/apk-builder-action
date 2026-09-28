@@ -1,1 +1,1 @@
-build Prowser v1.2 redesigned controls icon splash fix2
+build Prowser v1.3 video tabs quick search
