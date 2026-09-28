@@ -17,11 +17,12 @@ import java.util.*;
 public class MainActivity extends Activity {
     private final int BG = Color.rgb(8,9,13);
     private final int SURFACE = Color.rgb(20,22,30);
-    private final int SURFACE2 = Color.rgb(28,30,40);
+    private final int SURFACE2 = Color.rgb(29,31,42);
     private final int TEXT = Color.rgb(246,247,251);
     private final int MUTED = Color.rgb(145,151,168);
     private final int ACCENT = Color.rgb(150,126,255);
     private final int OK = Color.rgb(102,221,176);
+    private final int DANGER = Color.rgb(255,105,120);
 
     private LinearLayout root, topBar, bottomBar;
     private FrameLayout content;
@@ -30,6 +31,9 @@ public class MainActivity extends Activity {
     private ProgressBar progress;
     private WebView web;
     private View home;
+    private LinearLayout tabsPage;
+    private ScrollView tabsScroll;
+    private LinearLayout tabsList;
     private View customView;
     private FrameLayout customContainer;
     private WebChromeClient.CustomViewCallback customCallback;
@@ -41,10 +45,14 @@ public class MainActivity extends Activity {
     private boolean clearOnExit = true;
     private long lastBack = 0;
     private int bottomInset = 0;
+    private boolean videoMode = false;
+    private boolean videoDetected = false;
+    private final Handler videoHandler = new Handler(Looper.getMainLooper());
 
     static class Tab {
         String url = "";
         String title = "New tab";
+        long lastUsed = System.currentTimeMillis();
         Tab(String u){ url=u; }
     }
 
@@ -60,6 +68,7 @@ public class MainActivity extends Activity {
         buildUi();
         newTab(false);
         if(!prefs.getBoolean("ageConfirmed",false)) showAgeGate();
+        startVideoDetection();
     }
 
     private int dp(int v){ return Math.round(v*getResources().getDisplayMetrics().density); }
@@ -87,10 +96,12 @@ public class MainActivity extends Activity {
         TextView v=text(symbol+"\n"+label,11,TEXT);
         v.setGravity(Gravity.CENTER);
         v.setTextAlignment(View.TEXT_ALIGNMENT_CENTER);
-        v.setLineSpacing(0f,.92f);
-        v.setPadding(dp(4),dp(3),dp(4),dp(2));
+        v.setLineSpacing(0f,.93f);
+        v.setPadding(dp(4),dp(2),dp(4),dp(2));
         v.setBackground(bg(Color.TRANSPARENT,14));
-        v.setClickable(true); v.setFocusable(true);
+        v.setClickable(true);
+        v.setFocusable(true);
+        v.setMinHeight(dp(56));
         return v;
     }
 
@@ -104,23 +115,35 @@ public class MainActivity extends Activity {
                 android.graphics.Insets bars=insets.getInsets(WindowInsets.Type.systemBars());
                 bottomInset=bars.bottom;
                 v.setPadding(0,bars.top,0,0);
-                if(bottomBar!=null){
-                    bottomBar.setPadding(dp(8),dp(5),dp(8),dp(8)+bottomInset);
-                    ViewGroup.LayoutParams p=bottomBar.getLayoutParams();
-                    if(p!=null){ p.height=dp(70)+bottomInset; bottomBar.setLayoutParams(p); }
-                }
             }else{
                 bottomInset=insets.getSystemWindowInsetBottom();
                 v.setPadding(0,insets.getSystemWindowInsetTop(),0,0);
-                if(bottomBar!=null){
-                    bottomBar.setPadding(dp(8),dp(5),dp(8),dp(8)+bottomInset);
-                    ViewGroup.LayoutParams p=bottomBar.getLayoutParams();
-                    if(p!=null){ p.height=dp(70)+bottomInset; bottomBar.setLayoutParams(p); }
-                }
             }
+            updateBottomBarInsets();
             return insets;
         });
 
+        buildTopBar();
+
+        progress=new ProgressBar(this,null,android.R.attr.progressBarStyleHorizontal);
+        progress.setMax(100); progress.setProgress(0);
+        progress.setProgressTintList(ColorStateList.valueOf(ACCENT));
+        root.addView(progress,new LinearLayout.LayoutParams(-1,dp(2)));
+
+        content=new FrameLayout(this);
+        root.addView(content,new LinearLayout.LayoutParams(-1,0,1));
+        buildHome();
+        buildWeb();
+        buildTabsPage();
+
+        buildBrowserBottomBar();
+        setContentView(root);
+        root.requestApplyInsets();
+        updateShield();
+        updateEngineChip();
+    }
+
+    private void buildTopBar(){
         topBar=new LinearLayout(this);
         topBar.setOrientation(LinearLayout.VERTICAL);
         topBar.setPadding(dp(12),dp(7),dp(12),dp(7));
@@ -158,7 +181,6 @@ public class MainActivity extends Activity {
         address.setHintTextColor(MUTED);
         address.setHint("Search or enter address");
         address.setTextSize(14);
-        address.setSelectAllOnFocus(false);
         address.setPadding(dp(14),0,dp(14),0);
         address.setBackground(strokeBg(SURFACE,17,Color.rgb(49,52,67)));
         address.setImeOptions(EditorInfo.IME_ACTION_GO);
@@ -181,44 +203,6 @@ public class MainActivity extends Activity {
         rp.leftMargin=dp(6); addressRow.addView(reload,rp);
         topBar.addView(addressRow,new LinearLayout.LayoutParams(-1,dp(54)));
         root.addView(topBar,new LinearLayout.LayoutParams(-1,dp(101)));
-
-        progress=new ProgressBar(this,null,android.R.attr.progressBarStyleHorizontal);
-        progress.setMax(100); progress.setProgress(0);
-        progress.setProgressTintList(ColorStateList.valueOf(ACCENT));
-        root.addView(progress,new LinearLayout.LayoutParams(-1,dp(2)));
-
-        content=new FrameLayout(this);
-        root.addView(content,new LinearLayout.LayoutParams(-1,0,1));
-        buildHome();
-        buildWeb();
-
-        bottomBar=new LinearLayout(this);
-        bottomBar.setGravity(Gravity.TOP|Gravity.CENTER_HORIZONTAL);
-        bottomBar.setPadding(dp(8),dp(5),dp(8),dp(8));
-        bottomBar.setBackgroundColor(BG);
-
-        TextView back=navButton("‹","Back");
-        TextView fwd=navButton("›","Forward");
-        TextView homeBtn=navButton("⌂","Home");
-        TextView tabsBtn=navButton("▢","Tabs");
-        TextView menu=navButton("⋯","Menu");
-
-        back.setOnClickListener(v->{ if(web.getVisibility()==View.VISIBLE && web.canGoBack()) web.goBack(); else showHome(); });
-        fwd.setOnClickListener(v->{ if(web.getVisibility()==View.VISIBLE && web.canGoForward()) web.goForward(); });
-        homeBtn.setOnClickListener(v->showHome());
-        tabsBtn.setOnClickListener(v->showTabsDialog());
-        menu.setOnClickListener(v->showMainMenu(menu));
-
-        for(TextView x:new TextView[]{back,fwd,homeBtn,tabsBtn,menu}){
-            bottomBar.addView(x,new LinearLayout.LayoutParams(0,dp(58),1));
-        }
-        tabCount=tabsBtn;
-        root.addView(bottomBar,new LinearLayout.LayoutParams(-1,dp(70)));
-
-        setContentView(root);
-        root.requestApplyInsets();
-        updateShield();
-        updateEngineChip();
     }
 
     private void buildHome(){
@@ -243,11 +227,7 @@ public class MainActivity extends Activity {
         start.setText("Search with "+searchEngine);
         start.setTextSize(15); start.setTextColor(TEXT); start.setAllCaps(false);
         start.setBackground(strokeBg(SURFACE,18,Color.rgb(52,55,70)));
-        start.setOnClickListener(v->{
-            address.requestFocus();
-            ((android.view.inputmethod.InputMethodManager)getSystemService(INPUT_METHOD_SERVICE))
-                .showSoftInput(address,android.view.inputmethod.InputMethodManager.SHOW_IMPLICIT);
-        });
+        start.setOnClickListener(v->showQuickSearch());
 
         TextView changeEngine=text("Change search engine",12,ACCENT);
         changeEngine.setGravity(Gravity.CENTER);
@@ -303,6 +283,304 @@ public class MainActivity extends Activity {
         content.addView(web,new FrameLayout.LayoutParams(-1,-1));
     }
 
+    private void buildTabsPage(){
+        tabsPage=new LinearLayout(this);
+        tabsPage.setOrientation(LinearLayout.VERTICAL);
+        tabsPage.setBackgroundColor(BG);
+        tabsPage.setPadding(dp(14),dp(8),dp(14),dp(12));
+        tabsPage.setVisibility(View.GONE);
+
+        LinearLayout header=new LinearLayout(this);
+        header.setGravity(Gravity.CENTER_VERTICAL);
+
+        TextView back=text("‹",32,TEXT);
+        back.setGravity(Gravity.CENTER);
+        back.setClickable(true);
+        back.setOnClickListener(v->hideTabsPage());
+
+        TextView title=text("Tabs",24,TEXT);
+        title.setTypeface(null,1);
+
+        TextView newTab=text("+ New",14,ACCENT);
+        newTab.setGravity(Gravity.CENTER);
+        newTab.setPadding(dp(10),0,dp(10),0);
+        newTab.setClickable(true);
+        newTab.setOnClickListener(v->{ newTab(true); hideTabsPage(); });
+
+        TextView closeAll=text("Close all",13,DANGER);
+        closeAll.setGravity(Gravity.CENTER);
+        closeAll.setPadding(dp(10),0,0,0);
+        closeAll.setClickable(true);
+        closeAll.setOnClickListener(v->closeAllTabs());
+
+        header.addView(back,new LinearLayout.LayoutParams(dp(44),dp(52)));
+        header.addView(title,new LinearLayout.LayoutParams(0,dp(52),1));
+        header.addView(newTab,new LinearLayout.LayoutParams(-2,dp(44)));
+        header.addView(closeAll,new LinearLayout.LayoutParams(-2,dp(44)));
+        tabsPage.addView(header,new LinearLayout.LayoutParams(-1,dp(58)));
+
+        TextView sub=text("Tap a tab to switch. Close anything you no longer need.",12,MUTED);
+        tabsPage.addView(sub,new LinearLayout.LayoutParams(-1,dp(38)));
+
+        tabsList=new LinearLayout(this);
+        tabsList.setOrientation(LinearLayout.VERTICAL);
+
+        tabsScroll=new ScrollView(this);
+        tabsScroll.addView(tabsList,new ScrollView.LayoutParams(-1,-2));
+        tabsPage.addView(tabsScroll,new LinearLayout.LayoutParams(-1,0,1));
+
+        content.addView(tabsPage,new FrameLayout.LayoutParams(-1,-1));
+    }
+
+    private void refreshTabsPage(){
+        tabsList.removeAllViews();
+        for(int i=0;i<tabs.size();i++){
+            final int index=i;
+            Tab t=tabs.get(i);
+
+            LinearLayout card=new LinearLayout(this);
+            card.setOrientation(LinearLayout.VERTICAL);
+            card.setPadding(dp(16),dp(14),dp(14),dp(12));
+            card.setBackground(strokeBg(index==activeTab?SURFACE2:SURFACE,18,index==activeTab?ACCENT:Color.rgb(45,48,61)));
+            card.setClickable(true);
+            card.setOnClickListener(v->{ switchToTab(index); hideTabsPage(); });
+
+            LinearLayout row=new LinearLayout(this);
+            row.setGravity(Gravity.CENTER_VERTICAL);
+
+            TextView title=text((index==activeTab?"●  ":"")+((t.title==null||t.title.isEmpty())?"New private tab":t.title),15,TEXT);
+            title.setMaxLines(1);
+            title.setEllipsize(android.text.TextUtils.TruncateAt.END);
+
+            TextView close=text("×",28,MUTED);
+            close.setGravity(Gravity.CENTER);
+            close.setClickable(true);
+            close.setOnClickListener(v->{ closeTab(index); refreshTabsPage(); });
+
+            row.addView(title,new LinearLayout.LayoutParams(0,dp(40),1));
+            row.addView(close,new LinearLayout.LayoutParams(dp(44),dp(44)));
+            card.addView(row,new LinearLayout.LayoutParams(-1,dp(44)));
+
+            String line=t.url.isEmpty()?"Ready for a new search":host(t.url)+"\n"+t.url;
+            TextView url=text(line,11,MUTED);
+            url.setMaxLines(2);
+            url.setEllipsize(android.text.TextUtils.TruncateAt.END);
+            card.addView(url,new LinearLayout.LayoutParams(-1,dp(42)));
+
+            LinearLayout.LayoutParams cp=new LinearLayout.LayoutParams(-1,dp(98));
+            cp.bottomMargin=dp(10);
+            tabsList.addView(card,cp);
+        }
+    }
+
+    private void showTabsPage(){
+        if(videoMode) exitVideoMode();
+        refreshTabsPage();
+        home.setVisibility(View.GONE);
+        web.setVisibility(View.GONE);
+        tabsPage.setVisibility(View.VISIBLE);
+        topBar.setVisibility(View.GONE);
+        progress.setVisibility(View.GONE);
+        bottomBar.setVisibility(View.GONE);
+    }
+
+    private void hideTabsPage(){
+        tabsPage.setVisibility(View.GONE);
+        topBar.setVisibility(View.VISIBLE);
+        progress.setVisibility(View.VISIBLE);
+        bottomBar.setVisibility(View.VISIBLE);
+        if(activeTab>=0 && !tabs.get(activeTab).url.isEmpty()){
+            web.setVisibility(View.VISIBLE);
+            home.setVisibility(View.GONE);
+        }else{
+            showHome();
+        }
+        root.requestApplyInsets();
+    }
+
+    private void buildBrowserBottomBar(){
+        if(bottomBar!=null) root.removeView(bottomBar);
+        bottomBar=new LinearLayout(this);
+        bottomBar.setGravity(Gravity.TOP|Gravity.CENTER_HORIZONTAL);
+        bottomBar.setBackgroundColor(BG);
+
+        TextView back=navButton("‹","Back");
+        TextView fwd=navButton("›","Forward");
+        TextView search=navButton("⌕","Search");
+        TextView tabsBtn=navButton("▢","Tabs");
+        TextView menu=navButton("⋯","Menu");
+
+        back.setOnClickListener(v->{ if(web.getVisibility()==View.VISIBLE && web.canGoBack()) web.goBack(); else showHome(); });
+        fwd.setOnClickListener(v->{ if(web.getVisibility()==View.VISIBLE && web.canGoForward()) web.goForward(); });
+        search.setOnClickListener(v->showQuickSearch());
+        tabsBtn.setOnClickListener(v->showTabsPage());
+        menu.setOnClickListener(v->showMainMenu(menu));
+
+        for(TextView x:new TextView[]{back,fwd,search,tabsBtn,menu}){
+            bottomBar.addView(x,new LinearLayout.LayoutParams(0,dp(60),1));
+        }
+        tabCount=tabsBtn;
+        root.addView(bottomBar,new LinearLayout.LayoutParams(-1,dp(72)+bottomInset));
+        updateBottomBarInsets();
+        updateTabsLabel();
+    }
+
+    private void buildVideoBottomBar(){
+        if(bottomBar!=null) root.removeView(bottomBar);
+        bottomBar=new LinearLayout(this);
+        bottomBar.setGravity(Gravity.TOP|Gravity.CENTER_HORIZONTAL);
+        bottomBar.setBackgroundColor(BG);
+
+        TextView rewind=navButton("−15","Back");
+        TextView play=navButton("▶","Play/Pause");
+        TextView forward=navButton("+15","Forward");
+        TextView fullscreen=navButton("⛶","Full");
+        TextView more=navButton("⋯","Browser");
+
+        rewind.setOnClickListener(v->videoCommand("const v=document.querySelector('video');if(v)v.currentTime=Math.max(0,v.currentTime-15);"));
+        play.setOnClickListener(v->videoCommand("const v=document.querySelector('video');if(v){if(v.paused)v.play();else v.pause();}"));
+        forward.setOnClickListener(v->videoCommand("const v=document.querySelector('video');if(v)v.currentTime=Math.min(v.duration||1e9,v.currentTime+15);"));
+        fullscreen.setOnClickListener(v->videoCommand("const v=document.querySelector('video');if(v){if(v.requestFullscreen)v.requestFullscreen();else if(v.webkitEnterFullscreen)v.webkitEnterFullscreen();}"));
+        more.setOnClickListener(v->{
+            PopupMenu m=new PopupMenu(this,more);
+            m.getMenu().add("Browser controls");
+            m.getMenu().add("Playback 0.75×");
+            m.getMenu().add("Playback 1×");
+            m.getMenu().add("Playback 1.25×");
+            m.getMenu().add("Playback 1.5×");
+            m.getMenu().add("Playback 2×");
+            if(Build.VERSION.SDK_INT>=26) m.getMenu().add("Picture in picture");
+            m.setOnMenuItemClickListener(item->{
+                String x=item.getTitle().toString();
+                if(x.equals("Browser controls")) exitVideoMode();
+                else if(x.startsWith("Playback ")){
+                    String n=x.replace("Playback ","").replace("×","");
+                    videoCommand("const v=document.querySelector('video');if(v)v.playbackRate="+n+";");
+                }else if(x.equals("Picture in picture")) enterPip();
+                return true;
+            });
+            m.show();
+        });
+
+        for(TextView x:new TextView[]{rewind,play,forward,fullscreen,more}){
+            bottomBar.addView(x,new LinearLayout.LayoutParams(0,dp(60),1));
+        }
+        root.addView(bottomBar,new LinearLayout.LayoutParams(-1,dp(72)+bottomInset));
+        updateBottomBarInsets();
+    }
+
+    private void updateBottomBarInsets(){
+        if(bottomBar==null) return;
+        bottomBar.setPadding(dp(8),dp(4),dp(8),dp(8)+bottomInset);
+        ViewGroup.LayoutParams p=bottomBar.getLayoutParams();
+        if(p!=null){
+            p.height=dp(72)+bottomInset;
+            bottomBar.setLayoutParams(p);
+        }
+    }
+
+    private void showQuickSearch(){
+        final Dialog d=new Dialog(this);
+        LinearLayout box=new LinearLayout(this);
+        box.setOrientation(LinearLayout.VERTICAL);
+        box.setPadding(dp(18),dp(14),dp(18),dp(18));
+        box.setBackground(bg(SURFACE,24));
+
+        LinearLayout header=new LinearLayout(this);
+        header.setGravity(Gravity.CENTER_VERTICAL);
+        TextView title=text("Quick Search",20,TEXT); title.setTypeface(null,1);
+        TextView engine=text(searchEngine,12,ACCENT); engine.setGravity(Gravity.CENTER);
+        engine.setPadding(dp(10),0,dp(10),0); engine.setBackground(strokeBg(SURFACE2,12,Color.rgb(55,58,73)));
+        engine.setClickable(true);
+        engine.setOnClickListener(v->{ d.dismiss(); showSearchEnginePicker(); });
+        header.addView(title,new LinearLayout.LayoutParams(0,dp(44),1));
+        header.addView(engine,new LinearLayout.LayoutParams(-2,dp(34)));
+        box.addView(header,new LinearLayout.LayoutParams(-1,dp(48)));
+
+        EditText q=new EditText(this);
+        q.setSingleLine(true); q.setTextColor(TEXT); q.setHintTextColor(MUTED);
+        q.setHint("What do you want to search?");
+        q.setTextSize(16); q.setPadding(dp(14),0,dp(14),0);
+        q.setBackground(strokeBg(SURFACE2,16,Color.rgb(58,61,77)));
+        q.setImeOptions(EditorInfo.IME_ACTION_SEARCH);
+        q.setOnEditorActionListener((v,id,event)->{
+            if(id==EditorInfo.IME_ACTION_SEARCH || id==EditorInfo.IME_ACTION_GO || (event!=null&&event.getKeyCode()==KeyEvent.KEYCODE_ENTER)){
+                String query=q.getText().toString().trim();
+                if(!query.isEmpty()){ d.dismiss(); loadUrl(searchUrl(query)); }
+                return true;
+            }
+            return false;
+        });
+        box.addView(q,new LinearLayout.LayoutParams(-1,dp(56)));
+
+        TextView hint=text("Searches open in your current tab. No new tab is created.",11,MUTED);
+        hint.setGravity(Gravity.CENTER);
+        LinearLayout.LayoutParams hp=new LinearLayout.LayoutParams(-1,dp(42)); hp.topMargin=dp(4);
+        box.addView(hint,hp);
+
+        d.setContentView(box);
+        Window w=d.getWindow();
+        if(w!=null){
+            w.setBackgroundDrawableResource(android.R.color.transparent);
+            w.setLayout(-1,-2);
+            w.setGravity(Gravity.BOTTOM);
+            WindowManager.LayoutParams lp=w.getAttributes();
+            lp.width=WindowManager.LayoutParams.MATCH_PARENT;
+            lp.dimAmount=.45f;
+            w.setAttributes(lp);
+            w.addFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND);
+            if(Build.VERSION.SDK_INT>=30){
+                w.setDecorFitsSystemWindows(true);
+            }
+        }
+        d.setOnShowListener(x->{
+            Window ww=d.getWindow();
+            if(ww!=null) ww.setLayout(-1,-2);
+            q.requestFocus();
+            q.postDelayed(()->((android.view.inputmethod.InputMethodManager)getSystemService(INPUT_METHOD_SERVICE))
+                .showSoftInput(q,android.view.inputmethod.InputMethodManager.SHOW_IMPLICIT),150);
+        });
+        d.show();
+    }
+
+    private void startVideoDetection(){
+        videoHandler.postDelayed(new Runnable(){
+            @Override public void run(){
+                detectVideo();
+                videoHandler.postDelayed(this,1500);
+            }
+        },1500);
+    }
+
+    private void detectVideo(){
+        if(web==null || web.getVisibility()!=View.VISIBLE || tabsPage.getVisibility()==View.VISIBLE) return;
+        web.evaluateJavascript(
+            "(function(){try{const vs=[...document.querySelectorAll('video')];const v=vs.find(x=>!x.paused&&x.readyState>=2)||vs.find(x=>x.readyState>=2);return v?((!v.paused)?'playing':'ready'):'none';}catch(e){return 'none';}})();",
+            value->{
+                String state=value==null?"":value.replace("\"","");
+                videoDetected=state.equals("playing")||state.equals("ready");
+                if(state.equals("playing") && !videoMode) enterVideoMode();
+                if(state.equals("none") && videoMode) exitVideoMode();
+            }
+        );
+    }
+
+    private void enterVideoMode(){
+        if(videoMode || !videoDetected) return;
+        videoMode=true;
+        buildVideoBottomBar();
+    }
+
+    private void exitVideoMode(){
+        if(!videoMode) return;
+        videoMode=false;
+        buildBrowserBottomBar();
+    }
+
+    private void videoCommand(String js){
+        if(web!=null) web.evaluateJavascript("(function(){try{"+js+"return true;}catch(e){return false;}})();",null);
+    }
+
     private void showAgeGate(){
         new AlertDialog.Builder(this)
             .setTitle("Prowser is for adults")
@@ -346,17 +624,6 @@ public class MainActivity extends Activity {
 
     private void updateEngineChip(){
         if(engineChip!=null) engineChip.setText(searchEngine);
-    }
-
-    private void showPrivacyIntro(){
-        String[] levels={"Private — balanced compatibility","Protected — stronger isolation","Maximum — session-first privacy"};
-        int checked=privacy.equals("private")?0:privacy.equals("maximum")?2:1;
-        new AlertDialog.Builder(this).setTitle("Default privacy")
-            .setSingleChoiceItems(levels,checked,(d,which)->{
-                privacy=which==0?"private":which==2?"maximum":"protected";
-                prefs.edit().putString("privacy",privacy).apply();
-                applyPrivacy(); updateShield(); d.dismiss();
-            }).show();
     }
 
     private void updateShield(){
@@ -415,8 +682,9 @@ public class MainActivity extends Activity {
         }
         if(activeTab<0) newTab(false);
         Tab t=tabs.get(activeTab);
-        t.url=url; t.title=host(url);
+        t.url=url; t.title=host(url); t.lastUsed=System.currentTimeMillis();
         applyPrivacy();
+        tabsPage.setVisibility(View.GONE);
         home.setVisibility(View.GONE);
         web.setVisibility(View.VISIBLE);
         address.setText(url);
@@ -432,10 +700,12 @@ public class MainActivity extends Activity {
     }
 
     private void showHome(){
+        if(videoMode) exitVideoMode();
         if(web!=null){
             web.stopLoading();
             web.setVisibility(View.GONE);
         }
+        tabsPage.setVisibility(View.GONE);
         home.setVisibility(View.VISIBLE);
         progress.setProgress(0);
         address.setText("");
@@ -450,45 +720,37 @@ public class MainActivity extends Activity {
         if(notify) Toast.makeText(this,"New private tab",Toast.LENGTH_SHORT).show();
     }
 
+    private void switchToTab(int index){
+        if(index<0 || index>=tabs.size()) return;
+        activeTab=index;
+        Tab t=tabs.get(activeTab);
+        t.lastUsed=System.currentTimeMillis();
+        if(t.url.isEmpty()) showHome();
+        else loadUrl(t.url);
+        updateTabsLabel();
+    }
+
+    private void closeTab(int index){
+        if(index<0 || index>=tabs.size()) return;
+        tabs.remove(index);
+        if(tabs.isEmpty()) tabs.add(new Tab(""));
+        if(activeTab>index) activeTab--;
+        else if(activeTab==index) activeTab=Math.min(index,tabs.size()-1);
+        updateTabsLabel();
+    }
+
+    private void closeAllTabs(){
+        tabs.clear();
+        tabs.add(new Tab(""));
+        activeTab=0;
+        hideTabsPage();
+        showHome();
+        updateTabsLabel();
+        Toast.makeText(this,"All tabs closed",Toast.LENGTH_SHORT).show();
+    }
+
     private void updateTabsLabel(){
         if(tabCount!=null) tabCount.setText("▢\nTabs "+tabs.size());
-    }
-
-    private void showTabsDialog(){
-        String[] names=new String[tabs.size()+1];
-        for(int i=0;i<tabs.size();i++){
-            Tab t=tabs.get(i);
-            String label=t.url.isEmpty()?"New private tab":t.title;
-            names[i]=(i==activeTab?"✓  ":"     ")+label;
-        }
-        names[tabs.size()]="+  New tab";
-
-        new AlertDialog.Builder(this)
-            .setTitle("Open tabs")
-            .setItems(names,(d,which)->{
-                if(which==tabs.size()){
-                    newTab(true);
-                    return;
-                }
-                activeTab=which;
-                Tab t=tabs.get(activeTab);
-                if(t.url.isEmpty()) showHome();
-                else loadUrl(t.url);
-                updateTabsLabel();
-            })
-            .setNeutralButton("New tab",(d,w)->newTab(true))
-            .setNegativeButton("Close current",(d,w)->closeCurrentTab())
-            .show();
-    }
-
-    private void closeCurrentTab(){
-        if(tabs.isEmpty()) return;
-        tabs.remove(activeTab);
-        if(tabs.isEmpty()) tabs.add(new Tab(""));
-        activeTab=Math.max(0,Math.min(activeTab,tabs.size()-1));
-        Tab t=tabs.get(activeTab);
-        if(t.url.isEmpty()) showHome(); else loadUrl(t.url);
-        updateTabsLabel();
     }
 
     private void showPrivacyMenu(){
@@ -514,24 +776,26 @@ public class MainActivity extends Activity {
         PopupMenu m=new PopupMenu(this,anchor);
         m.getMenu().add("New tab");
         m.getMenu().add("Search engine");
+        if(videoDetected) m.getMenu().add(videoMode?"Browser controls":"Video controls");
         m.getMenu().add("Privacy");
         m.getMenu().add("Clear session");
         m.getMenu().add("Open in another browser");
-        if(customView!=null && Build.VERSION.SDK_INT>=26) m.getMenu().add("Picture in picture");
         m.setOnMenuItemClickListener(item->{
             String x=item.getTitle().toString();
             if(x.equals("New tab")) newTab(true);
             else if(x.equals("Search engine")) showSearchEnginePicker();
+            else if(x.equals("Video controls")) enterVideoMode();
+            else if(x.equals("Browser controls")) exitVideoMode();
             else if(x.equals("Privacy")) showPrivacyMenu();
             else if(x.equals("Clear session")) clearSession();
             else if(x.equals("Open in another browser")) openExternal();
-            else if(x.equals("Picture in picture")) enterPip();
             return true;
         });
         m.show();
     }
 
     private void clearSession(){
+        if(videoMode) exitVideoMode();
         web.stopLoading();
         web.clearHistory();
         web.clearCache(true);
@@ -589,6 +853,8 @@ public class MainActivity extends Activity {
         @Override public void onPageStarted(WebView v,String url,Bitmap icon){
             progress.setProgress(8);
             address.setText(url);
+            videoDetected=false;
+            if(videoMode) exitVideoMode();
             if(activeTab>=0){
                 tabs.get(activeTab).url=url;
                 tabs.get(activeTab).title=host(url);
@@ -601,9 +867,11 @@ public class MainActivity extends Activity {
             if(activeTab>=0){
                 tabs.get(activeTab).url=url;
                 tabs.get(activeTab).title=(t==null||t.isEmpty())?host(url):t;
+                tabs.get(activeTab).lastUsed=System.currentTimeMillis();
             }
             address.setText(url);
             updateTabsLabel();
+            detectVideo();
         }
 
         @Override public boolean shouldOverrideUrlLoading(WebView v,WebResourceRequest r){
@@ -621,8 +889,7 @@ public class MainActivity extends Activity {
                 return true;
             }
             try{
-                Intent external=new Intent(Intent.ACTION_VIEW,Uri.parse(u));
-                startActivity(external);
+                startActivity(new Intent(Intent.ACTION_VIEW,Uri.parse(u)));
             }catch(Exception e){
                 Toast.makeText(MainActivity.this,"External link blocked",Toast.LENGTH_SHORT).show();
             }
@@ -659,10 +926,7 @@ public class MainActivity extends Activity {
         }
 
         @Override public void onShowCustomView(View view,CustomViewCallback cb){
-            if(customView!=null){
-                cb.onCustomViewHidden();
-                return;
-            }
+            if(customView!=null){ cb.onCustomViewHidden(); return; }
             customView=view;
             customCallback=cb;
             customContainer=new FrameLayout(MainActivity.this);
@@ -735,6 +999,14 @@ public class MainActivity extends Activity {
             hideCustomVideo();
             return;
         }
+        if(tabsPage!=null && tabsPage.getVisibility()==View.VISIBLE){
+            hideTabsPage();
+            return;
+        }
+        if(videoMode){
+            exitVideoMode();
+            return;
+        }
         if(web.getVisibility()==View.VISIBLE && web.canGoBack()){
             web.goBack();
             return;
@@ -753,6 +1025,7 @@ public class MainActivity extends Activity {
     }
 
     @Override protected void onDestroy(){
+        videoHandler.removeCallbacksAndMessages(null);
         if(clearOnExit) clearSession();
         if(web!=null){
             web.stopLoading();
