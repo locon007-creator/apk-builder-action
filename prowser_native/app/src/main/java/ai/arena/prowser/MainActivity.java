@@ -12,7 +12,6 @@ import android.view.*;
 import android.view.inputmethod.EditorInfo;
 import android.webkit.*;
 import android.widget.*;
-import java.net.*;
 import java.util.*;
 
 public class MainActivity extends Activity {
