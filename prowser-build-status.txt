@@ -1,2 +1,2 @@
-run_id=36380898963
-release=https://github.com/locon007-creator/apk-builder-action/releases/download/prowser-v1.5-build/Prowser-v1.5.apk
+run_id=36382057812
+release=https://github.com/locon007-creator/apk-builder-action/releases/download/prowser-v1.6-build/Prowser-v1.6.apk
