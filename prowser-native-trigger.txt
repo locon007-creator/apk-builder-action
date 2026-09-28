@@ -1,1 +1,1 @@
-build Prowser v1.4 fullscreen bookmarks menu
+build Prowser v1.5 fullscreen overlay nav visuals
