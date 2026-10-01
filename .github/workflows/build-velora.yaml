@@ -3,7 +3,7 @@ on:
   push:
     branches: [main]
     paths:
-      - 'velora-source.zip'
+      - 'velora/chunk-*'
       - '.github/workflows/build-velora.yaml'
   workflow_dispatch:
 
@@ -16,8 +16,11 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
-      - name: Unpack Velora
+      - name: Reconstruct Velora source
         run: |
+          cat velora/chunk-* > velora-source.b64
+          base64 -d velora-source.b64 > velora-source.zip
+          unzip -t velora-source.zip
           rm -rf velora-work
           mkdir velora-work
           unzip -q velora-source.zip -d velora-work
