@@ -1,0 +1,73 @@
+) showHistory();
++        else if ("home".equals(a)) loadHome();
++    }
++
++    private String hostOf(String url) {
++        try { String h=new URI(url).getHost(); return h==null?url:h.replaceFirst("^www\\.",""); } catch(Exception e){ return url; }
++    }
++    private String html(String s) { if(s==null)return ""; return s.replace("&","&amp;").replace("<","&lt;").replace(">","&gt;").replace("\"","&quot;").replace("'","&#39;"); }
++
+     private String normalizeInput(String input) {
+         String q = input.trim();
+         if (q.matches("^[a-zA-Z][a-zA-Z0-9+.-]*://.*$")) return q;
+@@ -336,13 +379,13 @@
+         LinearLayout box = new LinearLayout(this);
+         box.setOrientation(LinearLayout.VERTICAL);
+         box.setPadding(dp(18),dp(16),dp(18),dp(18));
+-        box.setBackgroundColor(Color.WHITE);
++        box.setBackgroundColor(SURFACE);
+ 
+         TextView title = new TextView(this); title.setText("Search or enter address"); title.setTextColor(INK); title.setTextSize(18); title.setPadding(0,0,0,dp(12)); box.addView(title);
+         EditText input = new EditText(this);
+         input.setSingleLine(true); input.setTextSize(18); input.setHint("Search the web or type a URL"); input.setSelectAllOnFocus(true);
+         String url = current()==null?"":current().getUrl(); if (url!=null && !url.contains("velora.home")) input.setText(url);
+-        input.setBackground(roundRect(BG,dp(16),Color.rgb(220,223,230)));
++        input.setTextColor(INK); input.setHintTextColor(MUTED); input.setBackground(roundRect(SURFACE_2,dp(16),BORDER));
+         input.setPadding(dp(15),0,dp(15),0);
+         box.addView(input,new LinearLayout.LayoutParams(-1,dp(54)));
+         Button go = new Button(this); go.setText("Go"); go.setTextColor(Color.WHITE); go.setTextSize(16); go.setBackground(roundRect(ACCENT,dp(16),ACCENT));
+@@ -367,7 +410,7 @@
+         TextView head=new TextView(this); head.setText("Tabs  ·  "+tabs.size()); head.setTextSize(23); head.setTextColor(INK); head.setPadding(dp(5),dp(5),dp(5),dp(12)); root.addView(head);
+         for(int i=0;i<tabs.size();i++){
+             final int idx=i;
+-            LinearLayout row=new LinearLayout(this); row.setGravity(Gravity.CENTER_VERTICAL); row.setPadding(dp(12),dp(6),dp(6),dp(6)); row.setBackground(roundRect(Color.WHITE,dp(16),Color.rgb(225,228,234)));
++            LinearLayout row=new LinearLayout(this); row.setGravity(Gravity.CENTER_VERTICAL); row.setPadding(dp(12),dp(6),dp(6),dp(6)); row.setBackground(roundRect(SURFACE,dp(16),BORDER));
+             TextView t=new TextView(this); t.setText((i==activeTab?"●  ":"")+tabs.get(i).title); t.setTextColor(INK); t.setTextSize(15); t.setSingleLine(true); row.addView(t,new LinearLayout.LayoutParams(0,dp(52),1f));
+             Button x=compactButton("×"); x.setTextSize(25); row.addView(x,new LinearLayout.LayoutParams(dp(50),dp(50)));
+             row.setOnClickListener(v->{switchToTab(idx);d.dismiss();});
+@@ -380,20 +423,26 @@
+ 
+     private void openMenu(View anchor) {
+         PopupMenu p=new PopupMenu(this,anchor);
+-        p.getMenu().add("Enter video fullscreen");
+-        p.getMenu().add("Bookmark this page");
++        p.getMenu().add("New tab");
++        p.getMenu().add("Home");
++        p.getMenu().add("Tabs");
+         p.getMenu().add("Bookmarks");
+         p.getMenu().add("History");
++        p.getMenu().add("Bookmark this page");
++        p.getMenu().add("Enter video fullscreen");
+         p.getMenu().add("Search engine");
+         p.getMenu().add("Copy page address");
+         p.getMenu().add("Share");
+         p.getMenu().add("Privacy settings");
+         p.setOnMenuItemClickListener(item->{
+             String s=item.getTitle().toString();
+-            if(s.startsWith("Enter video")) requestVideoFullscreen();
+-            else if(s.startsWith("Bookmark this")) addBookmark();
++            if(s.equals("New tab")) newTab(true);
++            else if(s.equals("Home")) loadHome();
++            else if(s.equals("Tabs")) showTabs();
+             else if(s.equals("Bookmarks")) showBookmarks();
+             else if(s.equals("History")) showHistory();
++            else if(s.startsWith("Bookmark this")) addBookmark();
++            else if(s.startsWith("Enter video")) requestVideoFullscreen();
+             else if(s.equals("Search engine")) chooseEngine();
+             else if(s.startsWith("Copy")) copyAddress();
+             else if(s.equals("Share")) sharePage();
+@@ -454,7 +503,7 @@
+         if(android.os.Build.VERSION.SDK_INT>=30){ WindowInsetsController c=getWindow().getInsetsController(); if(c!=null){c.hide(WindowInsets.Type.statusBars()|WindowInsets.Type.navigationBars());c.setSystemBarsBehavior(WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE);} }
+         else getWindow().getDecorView().setSystemUiVisibility(5894|View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY);
+     }
+-    private void showSystemBars(){ if(android.os.Build.VERSION.SDK_INT>=30){WindowInsetsController c=getWindow().getInsetsController();if(c!=null)c.show(WindowInse

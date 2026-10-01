@@ -1,0 +1,81 @@
+--- orig/VeloraBrowser/app/src/main/java/com/velora/browser/MainActivity.java	2026-10-01 02:37:47.000000000 +0000
++++ src/VeloraBrowser/app/src/main/java/com/velora/browser/MainActivity.java	2026-10-01 03:13:55.734405723 +0000
+@@ -51,10 +51,13 @@
+ public class MainActivity extends Activity {
+     private static final String PREFS = "velora_prefs";
+     private static final String HOME_URL = "https://velora.home/";
+-    private static final int BG = Color.rgb(246,247,249);
+-    private static final int INK = Color.rgb(11,13,16);
+-    private static final int MUTED = Color.rgb(102,108,118);
+-    private static final int ACCENT = Color.rgb(53,92,255);
++    private static final int BG = Color.rgb(9,11,15);
++    private static final int SURFACE = Color.rgb(17,20,27);
++    private static final int SURFACE_2 = Color.rgb(24,28,36);
++    private static final int INK = Color.rgb(244,246,250);
++    private static final int MUTED = Color.rgb(151,159,173);
++    private static final int BORDER = Color.rgb(47,53,65);
++    private static final int ACCENT = Color.rgb(96,126,255);
+ 
+     private FrameLayout webContainer;
+     private TextView locationText;
+@@ -80,11 +83,11 @@
+         super.onCreate(savedInstanceState);
+         prefs = getSharedPreferences(PREFS, MODE_PRIVATE);
+         getWindow().setStatusBarColor(BG);
+-        getWindow().setNavigationBarColor(INK);
+-        if (android.os.Build.VERSION.SDK_INT >= 23) {
+-            getWindow().getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR);
+-        }
+-        setContentView(buildShell());
++        getWindow().setNavigationBarColor(BG);
++        getWindow().getDecorView().setSystemUiVisibility(0);
++        View shell = buildShell();
++        setContentView(shell);
++        applySystemInsets(shell);
+         newTab(true);
+     }
+ 
+@@ -107,7 +110,7 @@
+         locationText.setGravity(Gravity.CENTER_VERTICAL);
+         locationText.setSingleLine(true);
+         locationText.setPadding(dp(12),0,dp(10),0);
+-        locationText.setBackground(roundRect(Color.WHITE, dp(18), Color.rgb(225,228,234)));
++        locationText.setBackground(roundRect(SURFACE_2, dp(18), BORDER));
+         locationText.setOnClickListener(v -> openSearchSheet());
+         LinearLayout.LayoutParams locLp = new LinearLayout.LayoutParams(0, dp(38), 1f);
+         top.addView(locationText, locLp);
+@@ -124,7 +127,7 @@
+         bottom.setOrientation(LinearLayout.HORIZONTAL);
+         bottom.setGravity(Gravity.CENTER);
+         bottom.setPadding(dp(5), dp(4), dp(5), dp(5));
+-        bottom.setBackgroundColor(Color.WHITE);
++        bottom.setBackgroundColor(SURFACE);
+         root.addView(bottom, new LinearLayout.LayoutParams(-1, dp(72)));
+ 
+         backButton = navButton("‹", "Back");
+@@ -182,7 +185,7 @@
+ 
+     private WebView createWebView() {
+         WebView w = new WebView(this);
+-        w.setBackgroundColor(Color.WHITE);
++        w.setBackgroundColor(BG);
+         WebSettings s = w.getSettings();
+         s.setJavaScriptEnabled(true);
+         s.setDomStorageEnabled(true);
+@@ -209,6 +212,7 @@
+             @Override public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest req) {
+                 Uri u = req.getUrl();
+                 String scheme = u.getScheme();
++                if ("velora".equalsIgnoreCase(scheme)) { handleInternalAction(u); return true; }
+                 if ("http".equalsIgnoreCase(scheme) || "https".equalsIgnoreCase(scheme)) return false;
+                 try { startActivity(new Intent(Intent.ACTION_VIEW, u)); } catch (Exception ignored) {}
+                 return true;
+@@ -305,15 +309,54 @@
+     private void loadHome() { WebView w=current(); if (w!=null) renderHome(w); }
+ 
+     private void renderHome(WebView w) {
+-        String html = "<!doctype html><html><meta name='viewport' content='width=device-width,initial-scale=1'><style>"+
+-                "*{box-sizing:border-box}body{margin:0;font-family:system-ui,-apple-system,sans-serif;background:#f6f7f9;color:#0b0d10;padding:44px 22px}main{max-width:520px;margin:auto}.mark{width:64px;height:64px;border-radius:21px;background:#355cff;color:#fff;display:grid;place-items:center;font-weight:900;font-size:34px;box-shadow:0 12px 32px #355cff33}h1{font-size:35px;margin:22px 0 5px;letter-spacing:-1.4px}.sub{color:#666c76;font-size:15px}.search{margin-top:34px;background:#fff;border:1px solid #e1e4ea;border-radius:20px;padding:18px;font-weight:650;box-shadow:0 8px 30px #00000009}.cards{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:26px}.card{background:#fff;border:1px solid #e5e7ec;border-radius:18px;padding:18px;min-height:96px}.card b{display:block;margin-bottom:7px}.card span{font-size:12px;color:#747a84}</style><main>"+
+-                "<div class='mark'>V</div><h1>Velora</h1><div class='sub'>Clean browsing. Premium video.</div>"+
+-                "<div class='search' onclick=\"location.href='https://www.google.com/'\">⌕ &nbsp; Search or enter a website</div>"+
+-           

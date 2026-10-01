@@ -1,0 +1,41 @@
+     "<div class='cards'><div class='card'><b>Private by default</b><span>Third-party cookies and pop-up windows are restricted.</span></div><div class='card'><b>Video first</b><span>Fullscreen playback with large controls when sites allow it.</span></div></div>"+
++        JSONArray bookmarks = getArray("bookmarks");
++        JSONArray history = getArray("history");
++        StringBuilder bm = new StringBuilder();
++        int bStart = Math.max(0, bookmarks.length()-6);
++        for (int i=bookmarks.length()-1; i>=bStart; i--) {
++            try {
++                JSONObject o = bookmarks.getJSONObject(i);
++                bm.append("<a class='list' href='").append(html(o.optString("url"))).append("'><span class='favicon'>★</span><span><b>").append(html(o.optString("title", "Bookmark"))).append("</b><small>").append(html(hostOf(o.optString("url")))).append("</small></span></a>");
++            } catch(Exception ignored) {}
++        }
++        if (bm.length()==0) bm.append("<div class='empty'>No bookmarks yet</div>");
++
++        StringBuilder recent = new StringBuilder();
++        int shown=0;
++        for (int i=history.length()-1; i>=0 && shown<5; i--,shown++) {
++            try {
++                JSONObject o=history.getJSONObject(i);
++                recent.append("<a class='list' href='").append(html(o.optString("url"))).append("'><span class='favicon'>↗</span><span><b>").append(html(o.optString("title", "Recent page"))).append("</b><small>").append(html(hostOf(o.optString("url")))).append("</small></span></a>");
++            } catch(Exception ignored) {}
++        }
++        if (recent.length()==0) recent.append("<div class='empty'>Your recent pages will appear here</div>");
++
++        String html = "<!doctype html><html><meta name='viewport' content='width=device-width,initial-scale=1,viewport-fit=cover'><style>"+
++                "*{box-sizing:border-box}body{margin:0;font-family:system-ui,-apple-system,sans-serif;background:#090b0f;color:#f4f6fa;padding:28px 18px 40px}main{max-width:620px;margin:auto}.hero{display:flex;align-items:center;gap:14px;margin:6px 2px 24px}.mark{width:48px;height:48px;border-radius:16px;background:linear-gradient(145deg,#6d88ff,#4668ff);display:grid;place-items:center;font-weight:900;font-size:25px;box-shadow:0 12px 34px #5878ff38}.brand b{font-size:23px;letter-spacing:-.6px}.brand small{display:block;color:#8f98aa;margin-top:2px}.search{display:block;background:#171b23;border:1px solid #303642;border-radius:19px;padding:17px 18px;color:#f4f6fa;text-decoration:none;font-weight:650;font-size:16px;box-shadow:0 10px 34px #0005}.quick{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:14px 0 27px}.q{background:#11141b;border:1px solid #292f3a;border-radius:17px;padding:14px 8px;text-align:center;color:#f4f6fa;text-decoration:none;font-size:13px}.q strong{display:block;font-size:20px;margin-bottom:5px}.section{display:flex;align-items:center;justify-content:space-between;margin:22px 4px 10px}.section b{font-size:16px}.section a{color:#91a6ff;text-decoration:none;font-size:13px}.panel{background:#11141b;border:1px solid #292f3a;border-radius:20px;overflow:hidden}.list{display:flex;align-items:center;gap:12px;padding:14px 14px;color:#f4f6fa;text-decoration:none;border-bottom:1px solid #252a34}.list:last-child{border-bottom:0}.favicon{width:36px;height:36px;border-radius:12px;background:#1d2330;display:grid;place-items:center;color:#91a6ff;flex:0 0 auto}.list span:last-child{min-width:0}.list b,.list small{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.list b{font-size:14px}.list small{color:#8892a4;font-size:12px;margin-top:3px}.empty{padding:18px;color:#7f899a;font-size:13px}</style><main>"+
++                "<div class='hero'><div class='mark'>V</div><div class='brand'><b>Velora</b><small>Private, video-first browser</small></div></div>"+
++                "<a class='search' href='velora://search'>⌕ &nbsp; Search or enter a website</a>"+
++                "<div class='quick'><a class='q' href='velora://newtab'><strong>＋</strong>New tab</a><a class='q' href='velora://tabs'><strong>▣ "+tabs.size()+"</strong>Tabs</a><a class='q' href='velora://bookmarks'><strong>★</strong>Bookmarks</a></div>"+
++                "<div class='section'><b>Bookmarks</b><a href='velora://bookmarks'>View all</a></div><div class='panel'>"+bm+"</div>"+
++                "<div class='section'><b>Recent browsing</b><a href='velora://history'>History</a></div><div class='panel'>"+recent+"</div>"+
+                 "</main></html>";
+         w.loadDataWithBaseURL(HOME_URL, html, "text/html", "UTF-8", null);
+     }
+ 
++    private void handleInternalAction(Uri u) {
++        String a = u.getHost()==null ? "" : u.getHost().toLowerCase();
++        if ("search".equals(a)) openSearchSheet();
++        else if ("tabs".equals(a)) showTabs();
++        else if ("newtab".equals(a)) newTab(true);
++        else if ("bookmarks".equals(a)) showBookmarks();
++        else if ("history".equals(a)
